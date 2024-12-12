@@ -16,8 +16,8 @@ class _Page1State extends State<Page1> {
     "left": false,
     "right": false,
     "down": false,
+    "collect": false,  // Add a new key for the collect button
   };
-
 
   void _printContinuously(String direction, int value) async {
     setState(() {
@@ -69,6 +69,50 @@ class _Page1State extends State<Page1> {
     isPressed = false;
   }
 
+  void _collectSensorData(String direction) async {
+    setState(() {
+      buttonState[direction] = true;
+    });
+
+    isPressed = true;
+    while (isPressed) {
+      // Send the value 5 for the collect sensor data button
+      try {
+        final response = await http.post(
+          Uri.parse('http://192.168.8.150/message'), // Your ESP32 server URL
+          headers: {'Content-Type': 'text/plain'},
+          body: '5', // Send 5 as plain text
+        );
+
+        if (response.statusCode == 200) {
+          print('Collect sensor data request successful: ${response.body}');
+        } else {
+          print('Failed to send POST request: ${response.statusCode}');
+        }
+      } catch (e) {
+        print('Error sending POST request: $e');
+      }
+
+      // Delay to prevent flooding the server with requests
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+
+    // When stopped, send 0
+    await http.post(
+      Uri.parse('http://192.168.8.150/message'),
+      headers: {'Content-Type': 'text/plain'},
+      body: '0',
+    );
+    print('Sent 0 when button released.');
+  }
+
+  void _stopCollecting(String direction) {
+    setState(() {
+      buttonState[direction] = false;
+    });
+
+    isPressed = false;
+  }
 
   Widget _buildArrowButton({
     required String direction,
@@ -114,7 +158,7 @@ class _Page1State extends State<Page1> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const CommonAppBar(title: 'Page 1'),
+      appBar: const CommonAppBar(title: 'Controls'),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -154,6 +198,14 @@ class _Page1State extends State<Page1> {
               icon: Icons.arrow_downward,
               onPressed: () => _printContinuously("down", 3),
               onReleased: () => _stopPrinting("down"),
+            ),
+            const SizedBox(height: 40), // Gap between rows
+            // Collect Sensor Data Button
+            _buildArrowButton(
+              direction: "collect",
+              icon: Icons.sensors,
+              onPressed: () => _collectSensorData("collect"),
+              onReleased: () => _stopCollecting("collect"),
             ),
           ],
         ),
